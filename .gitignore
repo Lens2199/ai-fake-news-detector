@@ -1,0 +1,12 @@
+# Node
+node_modules/
+.env
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Frontend build
+frontend/build
