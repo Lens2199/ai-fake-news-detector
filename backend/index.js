@@ -6,7 +6,13 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5050;
 
-// Improved CORS configuration that explicitly includes Vercel domain
+// Log startup environment information
+console.log('=== SERVER STARTUP ===');
+console.log(`NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+console.log(`OpenAI API Key exists: ${!!process.env.OPENAI_API_KEY}`);
+console.log(`OpenAI API Key length: ${process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0}`);
+
+// Improved CORS configuration
 app.use(cors({
   origin: ['https://lens2199.github.io', process.env.FRONTEND_URL || '*'],
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -22,10 +28,15 @@ const openai = new OpenAI({
 });
 
 app.post('/analyze', async (req, res) => {
+  console.log('=== NEW ANALYSIS REQUEST ===');
+  
   const { text } = req.body;
+  console.log(`Request body received: ${text ? 'yes' : 'no'}`);
+  console.log(`Text length: ${text ? text.length : 0} characters`);
 
   // Validate input
   if (!text || text.trim().length < 10) {
+    console.log('❌ Request rejected: text too short');
     return res.status(400).json({ 
       error: 'Please provide a longer text to analyze (minimum 10 characters).' 
     });
@@ -59,69 +70,140 @@ Text to analyze:
 ${text}
 """`;
 
-    // Call OpenAI with caching and rate limiting
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2, // Keep low temperature for more consistent results
-      max_tokens: 150,  // Limit response size
-    });
-
-    // Parse and validate the response
+    console.log(`Prompt prepared (${prompt.length} chars)`);
+    
+    // Try using gpt-3.5-turbo instead of gpt-4 for testing
+    const model = "gpt-3.5-turbo";
+    console.log(`🔄 Attempting OpenAI API call with model: ${model}`);
+    
     try {
-      const result = JSON.parse(completion.choices[0].message.content.trim());
+      console.log('⏳ Starting OpenAI API request...');
+      const startTime = Date.now();
       
-      // Validate required fields
-      if (!result.label || result.confidence === undefined) {
-        throw new Error('Invalid response format from AI model');
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 150,
+      });
+      
+      const endTime = Date.now();
+      console.log(`✅ OpenAI API request successful (${endTime - startTime}ms)`);
+      
+      if (completion && completion.choices && completion.choices.length > 0) {
+        console.log('Response content received');
+      } else {
+        console.error('❌ Unexpected response structure:', JSON.stringify(completion));
+      }
+
+      // Parse and validate the response
+      try {
+        const content = completion.choices[0].message.content.trim();
+        console.log(`Raw content from OpenAI: ${content}`);
+        
+        const result = JSON.parse(content);
+        console.log(`Parsed result: ${JSON.stringify(result)}`);
+        
+        // Validate required fields
+        if (!result.label || result.confidence === undefined) {
+          console.error('❌ Invalid response format from AI - missing required fields');
+          throw new Error('Invalid response format from AI model');
+        }
+        
+        // Standardize the response
+        const response = {
+          label: result.label,
+          confidence: result.confidence,
+          reasoning: result.reasoning || 'No detailed reasoning provided'
+        };
+        
+        console.log(`✅ Analysis successful: ${result.label} (${result.confidence * 100}% confidence)`);
+        res.json(response);
+      } catch (parseError) {
+        console.error('❌ Failed to parse AI response:', parseError);
+        console.error(`Raw content causing the parse error: ${completion.choices[0].message.content}`);
+        res.status(500).json({ 
+          error: 'Failed to process AI response',
+          details: completion.choices[0].message.content 
+        });
+      }
+    } catch (openaiError) {
+      console.error('=== OPENAI API ERROR DETAILS ===');
+      console.error(`Error name: ${openaiError.name}`);
+      console.error(`Error message: ${openaiError.message}`);
+      
+      // Log detailed error information
+      if (openaiError.response) {
+        console.error('API Response Error:');
+        console.error(`  Status: ${openaiError.response.status}`);
+        console.error(`  Data: ${JSON.stringify(openaiError.response.data)}`);
+        console.error(`  Headers: ${JSON.stringify(openaiError.response.headers)}`);
+      } else if (openaiError.request) {
+        console.error('No response received from API');
+        console.error(`Request details: ${JSON.stringify(openaiError.request)}`);
       }
       
-      // Standardize the response
-      const response = {
-        label: result.label,
-        confidence: result.confidence,
-        reasoning: result.reasoning || 'No detailed reasoning provided'
-      };
-      
-      // Log successful analysis
-      console.log(`Analysis complete: ${result.label} with ${result.confidence} confidence`);
-      
-      res.json(response);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      res.status(500).json({ 
-        error: 'Failed to process AI response',
-        details: completion.choices[0].message.content 
-      });
+      // Check for common error types
+      if (openaiError.message.includes('API key') || openaiError.message.includes('authentication')) {
+        console.error('🔑 API KEY ERROR DETECTED');
+        res.status(500).json({
+          error: 'Failed to analyze article',
+          message: 'OpenAI API key error. Please check your API key configuration.'
+        });
+      } else if (openaiError.message.includes('insufficient_quota') || openaiError.message.includes('exceeded')) {
+        console.error('💸 QUOTA EXCEEDED ERROR DETECTED');
+        res.status(500).json({
+          error: 'Failed to analyze article',
+          message: 'OpenAI API quota exceeded. Please check your usage limits.'
+        });
+      } else if (openaiError.message.includes('timeout') || openaiError.message.includes('ECONNRESET')) {
+        console.error('⏱️ TIMEOUT ERROR DETECTED');
+        res.status(500).json({
+          error: 'Failed to analyze article',
+          message: 'Connection timeout when calling OpenAI API.'
+        });
+      } else {
+        console.error('General OpenAI error:', openaiError);
+        res.status(500).json({
+          error: 'Failed to analyze article',
+          message: 'Connection error with OpenAI API.'
+        });
+      }
     }
   } catch (error) {
-    console.error('❌ Error analyzing:', error.response?.data || error.message);
-    
-    const errorMessage = error.response?.data?.error?.message || 
-                         error.message || 
-                         'Unknown error occurred';
+    console.error('=== GENERAL ERROR ===');
+    console.error(`Error type: ${error.name}`);
+    console.error(`Error message: ${error.message}`);
+    console.error(`Stack trace: ${error.stack}`);
     
     res.status(500).json({ 
       error: 'Failed to analyze article',
-      message: errorMessage
+      message: error.message || 'Unknown error occurred'
     });
   }
+});
+
+// Health check endpoint with detailed information
+app.get('/', (req, res) => {
+  console.log('Health check endpoint accessed');
+  res.json({
+    status: 'ok',
+    message: 'Fake News Detector API is running',
+    environment: process.env.NODE_ENV || 'development',
+    openai_key_configured: !!process.env.OPENAI_API_KEY,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Add OPTIONS preflight handler
 app.options('/analyze', cors());
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Fake News Detector API is running'
-  });
-});
-
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  console.error('=== UNHANDLED SERVER ERROR ===');
+  console.error(`Error: ${err.message}`);
+  console.error(`Stack: ${err.stack}`);
+  
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
@@ -132,4 +214,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔑 OpenAI API key configured: ${!!process.env.OPENAI_API_KEY}`);
 });
