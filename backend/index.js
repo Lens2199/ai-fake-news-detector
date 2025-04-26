@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 5050;
 
 // Improved CORS configuration that explicitly includes Vercel domain
 app.use(cors({
-  origin: ['https://ai-fake-news-detector-daxo5ar44-deos-projects-c99867b4.vercel.app', process.env.FRONTEND_URL || '*'],
+  origin: ['https://lens2199.github.io', process.env.FRONTEND_URL || '*'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true

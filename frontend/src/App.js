@@ -10,7 +10,20 @@ function App() {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5050';
+  // Hardcoded fallback API URL in case environment variable isn't available
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://ai-fake-news-detector-api.onrender.com';
+
+  // Example news snippets for testing
+  const examples = [
+    {
+      title: "Real News Example",
+      text: "Scientists have discovered a new species of deep-sea coral off the coast of Japan. The findings, published in the journal Marine Biology, suggest the coral may have unique properties that could be beneficial for medical research."
+    },
+    {
+      title: "Fake News Example",
+      text: "BREAKING: Scientists shocked as man grows third arm after COVID vaccine! Doctors say this is just the beginning of strange side effects. Government officials REFUSE to comment on this developing situation."
+    }
+  ];
 
   useEffect(() => {
     if (copied) {
@@ -19,24 +32,43 @@ function App() {
     }
   }, [copied]);
 
+  // Enhanced analyze function with debug logging
   const analyzeText = async () => {
+    console.log("Button clicked, starting analysis");
     setLoading(true);
     setResult(null);
     setError(null);
 
+    // Log the API URL being used
+    console.log("Using API URL:", apiUrl);
+    
     try {
+      console.log("Attempting to fetch from:", `${apiUrl}/analyze`);
+      
       const response = await fetch(`${apiUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
 
+      console.log("Fetch response received:", response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status} - Failed to analyze`);
+        const errorData = await response.text();
+        console.error("Error response:", errorData);
+        throw new Error(`HTTP ${response.status} - ${errorData}`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      console.log("Response content type:", contentType);
+      
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Response is not JSON:", contentType);
+        throw new Error("Response is not valid JSON");
       }
 
       const data = await response.json();
+      console.log("Data received:", data);
 
       // Set result with all properties
       setResult({
@@ -44,10 +76,17 @@ function App() {
         score: data.confidence,
         reasoning: data.reasoning || 'No reasoning provided'
       });
+      
+      console.log("Result set successfully");
     } catch (error) {
-      console.error('Error analyzing:', error);
+      console.error('Detailed error:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
       setError(error.message || 'Failed to analyze article');
     } finally {
+      console.log("Analysis complete, loading set to false");
       setLoading(false);
     }
   };
@@ -62,6 +101,10 @@ function App() {
     if (label === 'Fake') return 'border-red-400 text-red-500';
     if (label === 'Real') return 'border-green-400 text-green-500';
     return 'border-blue-400 text-blue-400';
+  };
+
+  const loadExample = (example) => {
+    setText(example.text);
   };
 
   const copyResult = () => {
@@ -83,26 +126,40 @@ Reasoning: ${result.reasoning}
         <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2">🧠 AI Fake News Detector</h1>
         <p className="text-gray-400 text-center mb-8">Powered by OpenAI GPT-4</p>
 
-        <div className="w-full">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste your news article here..."
-            rows="12"
-            className="w-full bg-gray-800 border-2 border-purple-500 rounded-lg p-4 mb-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600"
-          />
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-400">
-              {text.length > 0 ? `${text.length} characters` : 'Enter some text to analyze'}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="md:col-span-2">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste your news article here..."
+              rows="12"
+              className="w-full bg-gray-800 border-2 border-purple-500 rounded-lg p-4 mb-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600"
+            />
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-400">
+                {text.length > 0 ? `${text.length} characters` : 'Enter some text to analyze'}
+              </div>
+              <button
+                onClick={analyzeText}
+                disabled={loading || !text.trim() || text.trim().length < 10}
+                className={`bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200 disabled:opacity-50 flex items-center gap-2 ${loading ? 'animate-pulse' : ''}`}
+              >
+                {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+                {loading ? 'Analyzing...' : 'Check Article'}
+              </button>
             </div>
-            <button
-              onClick={analyzeText}
-              disabled={loading || !text.trim() || text.trim().length < 10}
-              className={`bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200 disabled:opacity-50 flex items-center gap-2 ${loading ? 'animate-pulse' : ''}`}
-            >
-              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-              {loading ? 'Analyzing...' : 'Check Article'}
-            </button>
+          </div>
+          
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-3">📰 Example Texts</h2>
+            <div className="space-y-3">
+              {examples.map((example, index) => (
+                <div key={index} className="cursor-pointer hover:bg-gray-700 p-2 rounded" onClick={() => loadExample(example)}>
+                  <p className="font-medium text-purple-400">{example.title}</p>
+                  <p className="text-sm text-gray-300 truncate">{example.text.substring(0, 60)}...</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
