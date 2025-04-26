@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Fake News Detector",
+  "name": "AI Fake News Detector",
   "icons": [
     {
       "src": "favicon.ico",
