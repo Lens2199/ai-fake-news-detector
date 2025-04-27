@@ -9,6 +9,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [useTestEndpoint, setUseTestEndpoint] = useState(false);
 
   // Hardcoded fallback API URL in case environment variable isn't available
   const apiUrl = process.env.REACT_APP_API_URL || 'https://ai-fake-news-detector-api.onrender.com';
@@ -39,13 +40,16 @@ function App() {
     setResult(null);
     setError(null);
 
+    // Determine which endpoint to use
+    const endpoint = useTestEndpoint ? 'test' : 'analyze';
+    
     // Log the API URL being used
-    console.log("Using API URL:", apiUrl);
+    console.log(`Using API URL: ${apiUrl}/${endpoint}`);
     
     try {
-      console.log("Attempting to fetch from:", `${apiUrl}/analyze`);
+      console.log(`Attempting to fetch from: ${apiUrl}/${endpoint}`);
       
-      const response = await fetch(`${apiUrl}/analyze`, {
+      const response = await fetch(`${apiUrl}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -94,12 +98,14 @@ function App() {
   const getLabel = (label) => {
     if (label === 'Fake') return '❌ FAKE';
     if (label === 'Real') return '✅ REAL';
+    if (label === 'Test') return '🧪 TEST';
     return '🌀 UNKNOWN';
   };
 
   const getColor = (label) => {
     if (label === 'Fake') return 'border-red-400 text-red-500';
     if (label === 'Real') return 'border-green-400 text-green-500';
+    if (label === 'Test') return 'border-purple-400 text-purple-500';
     return 'border-blue-400 text-blue-400';
   };
 
@@ -135,18 +141,32 @@ Reasoning: ${result.reasoning}
               rows="12"
               className="w-full bg-gray-800 border-2 border-purple-500 rounded-lg p-4 mb-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600"
             />
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-2">
               <div className="text-sm text-gray-400">
                 {text.length > 0 ? `${text.length} characters` : 'Enter some text to analyze'}
               </div>
-              <button
-                onClick={analyzeText}
-                disabled={loading || !text.trim() || text.trim().length < 10}
-                className={`bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200 disabled:opacity-50 flex items-center gap-2 ${loading ? 'animate-pulse' : ''}`}
-              >
-                {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
-                {loading ? 'Analyzing...' : 'Check Article'}
-              </button>
+              <div className="flex items-center">
+                <label className="inline-flex items-center mr-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useTestEndpoint}
+                    onChange={(e) => setUseTestEndpoint(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-300">Use test endpoint</span>
+                </label>
+                <button
+                  onClick={analyzeText}
+                  disabled={loading || !text.trim() || text.trim().length < 10}
+                  className={`bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200 disabled:opacity-50 flex items-center gap-2 ${loading ? 'animate-pulse' : ''}`}
+                >
+                  {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+                  {loading ? 'Analyzing...' : 'Check Article'}
+                </button>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">
+              {useTestEndpoint ? '⚠️ Using test endpoint - will return mock data' : ''}
             </div>
           </div>
           
@@ -193,6 +213,8 @@ Reasoning: ${result.reasoning}
                     ? 'bg-green-500'
                     : result.label === 'Fake'
                     ? 'bg-red-500'
+                    : result.label === 'Test'
+                    ? 'bg-purple-500'
                     : 'bg-blue-500'
                 }`}
                 style={{ width: `${(result.score * 100).toFixed(0)}%` }}
@@ -210,7 +232,7 @@ Reasoning: ${result.reasoning}
               </div>
             )}
 
-            {(result.label === 'Real' || result.label === 'Fake') && (
+            {(result.label === 'Real' || result.label === 'Fake' || result.label === 'Test') && (
               <div className="mt-6 mx-auto max-w-xs">
                 <Pie
                   data={{
@@ -222,7 +244,11 @@ Reasoning: ${result.reasoning}
                           100 - result.score * 100,
                         ],
                         backgroundColor: [
-                          result.label === 'Real' ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)',
+                          result.label === 'Real' 
+                            ? 'rgba(34,197,94,0.7)' 
+                            : result.label === 'Fake'
+                            ? 'rgba(239,68,68,0.7)'
+                            : 'rgba(168,85,247,0.7)',
                           'rgba(107,114,128,0.3)',
                         ],
                         borderColor: ['white', 'white'],
