@@ -21,9 +21,6 @@ A full-stack AI-powered web application that detects whether a news article is *
 🚀 **Live Frontend:** [AI Fake News Detector Frontend](https://lens2199.github.io/ai-fake-news-detector/)  
 🛠 **Backend API:** [AI Fake News Detector Backend](https://ai-fake-news-detector-production.up.railway.app/)
 
-🚀 **Live Frontend:** [AI Fake News Detector Frontend](https://lens2199.github.io/ai-fake-news-detector/)  
-🛠 **Backend API:** [AI Fake News Detector Backend](https://ai-fake-news-detector-production.up.railway.app/)
-
 ---
 
 ## 📸 Project Screenshots
