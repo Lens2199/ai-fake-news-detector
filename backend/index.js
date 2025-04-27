@@ -183,6 +183,19 @@ ${text}
   }
 });
 
+// Add test endpoint for troubleshooting deployment issues
+app.post('/test', (req, res) => {
+  console.log('=== TEST ENDPOINT ACCESSED ===');
+  console.log('Request body:', req.body);
+  
+  // Return a mock response
+  res.json({
+    label: "Test",
+    confidence: 1.0,
+    reasoning: "This is a test response to verify deployment without OpenAI dependency"
+  });
+});
+
 // Health check endpoint with detailed information
 app.get('/', (req, res) => {
   console.log('Health check endpoint accessed');
@@ -197,6 +210,7 @@ app.get('/', (req, res) => {
 
 // Add OPTIONS preflight handler
 app.options('/analyze', cors());
+app.options('/test', cors());
 
 // Error handling middleware
 app.use((err, req, res, next) => {
