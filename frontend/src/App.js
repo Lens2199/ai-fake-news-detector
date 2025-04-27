@@ -12,7 +12,7 @@ function App() {
   const [useTestEndpoint, setUseTestEndpoint] = useState(false);
 
   // Hardcoded fallback API URL in case environment variable isn't available
-  const apiUrl = process.env.REACT_APP_API_URL || 'ai-fake-news-detector-production.up.railway.app';
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://ai-fake-news-detector-production.up.railway.app';
 
   // Example news snippets for testing
   const examples = [
